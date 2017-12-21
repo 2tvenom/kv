@@ -38,6 +38,33 @@ func TestGetSetTTLSimpleCache(t *testing.T) {
 	}
 }
 
+func TestGetSetListCache(t *testing.T) {
+	cache := newSimpleCacheDb()
+
+	val := [][]byte{
+		[]byte("baz"),
+		[]byte("bar"),
+		[]byte("foo"),
+		[]byte("foobaz"),
+		[]byte("foo_bar"),
+		[]byte("hello"),
+	}
+
+	cache.SetList("foo", 0, val)
+
+	data, err := cache.GetList("foo")
+	if err != nil {
+		t.Fatal("Get key error", err.Error())
+	}
+
+	for i, elem := range data {
+		if string(elem) != string(val[i]) {
+			t.Fatal("Incorrect element", "expected", string(val[i]), "got", string(elem))
+		}
+	}
+}
+
+
 func BenchmarkGetParallel(b *testing.B) {
 	cache := newSimpleCacheDb()
 
