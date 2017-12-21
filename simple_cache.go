@@ -109,3 +109,29 @@ func (c *simpleCacheDb) GetList(key string) ([][]byte, error) {
 
 	return out, nil
 }
+
+func (c *simpleCacheDb) GetListElement(key string, position uint16) ([]byte, error) {
+	data, err := c.get(key, keyList)
+
+	if err != nil {
+		return nil, err
+	}
+
+	elemCount := *(*uint16)(unsafe.Pointer(&data[0]))
+
+	if position >= elemCount {
+		return nil, notFoundErr
+	}
+
+	off := uint64(elemCount) * 2 + 2
+	var i uint16
+	for i = 0; i < position; i++ {
+		off += uint64(*(*uint16)(unsafe.Pointer(&data[i*2+2:i*2+4][0])))
+	}
+
+	elemLen := *(*uint16)(unsafe.Pointer(&data[position*2+2:position*2+4][0]))
+	out := make([]byte, elemLen)
+	copy(out, data[off:off+uint64(elemLen)])
+
+	return out, nil
+}

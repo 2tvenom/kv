@@ -62,8 +62,24 @@ func TestGetSetListCache(t *testing.T) {
 			t.Fatal("Incorrect element", "expected", string(val[i]), "got", string(elem))
 		}
 	}
-}
 
+	positions := []uint16{3, 0, 2, 5}
+	for _, pos := range positions {
+		elem, err := cache.GetListElement("foo", pos)
+		if err != nil {
+			t.Fatal("Get key error", err.Error())
+		}
+
+		if string(elem) != string(val[pos]) {
+			t.Fatal("Incorrect element", "expected", string(val[pos]), "got", string(elem))
+		}
+	}
+
+	_, err = cache.GetListElement("foo", 6)
+	if err != notFoundErr {
+		t.Fatal("Expected error", notFoundErr.Error(), "got", err)
+	}
+}
 
 func BenchmarkGetParallel(b *testing.B) {
 	cache := newSimpleCacheDb()
@@ -72,13 +88,11 @@ func BenchmarkGetParallel(b *testing.B) {
 	cache.Set("baz", 0, []byte("barbaz"))
 	cache.Set("bar", 0, []byte("foobar"))
 
-
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			cache.Get("foo")
 		}
 	})
-
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -93,17 +107,14 @@ func BenchmarkGetParallel(b *testing.B) {
 	})
 }
 
-
 func BenchmarkSetParallel(b *testing.B) {
 	cache := newSimpleCacheDb()
-
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			cache.Set("foo", 0, []byte("bar"))
 		}
 	})
-
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
