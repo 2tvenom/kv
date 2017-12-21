@@ -6,6 +6,7 @@ import (
 	"io"
 	"github.com/pkg/errors"
 	"strconv"
+	//"hash/fnv"
 )
 
 const (
@@ -36,7 +37,6 @@ var (
 	approvedCommands           map[string]int
 	incorrectCommandError      = errors.New("Incorrect command name")
 	longKeyNameError           = errors.New("Maximum key name length is 256")
-	smallParserBufferSizeError = errors.New("Minimum parser buffer size 512")
 	notTTl                     = errors.New("")
 	zeroTTl                    = errors.New("TTL can not be zero")
 )
