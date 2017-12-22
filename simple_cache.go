@@ -28,6 +28,25 @@ func newSimpleCacheDb() *simpleCacheDb {
 	return c
 }
 
+func (c *simpleCacheDb) Keys() ([]string) {
+	out := []string{}
+	for i, block := range c.blocks {
+		c.locks[i].Lock()
+		for key := range block {
+			out = append(out, key)
+		}
+		c.locks[i].Unlock()
+	}
+	return out
+}
+
+func (c *simpleCacheDb) Remove(key string) {
+	id := blockByKey(key)
+	c.locks[id].Lock()
+	delete(c.blocks[id], key)
+	c.locks[id].Unlock()
+}
+
 func (c *simpleCacheDb) get(key string, keyType uint8) ([]byte, error) {
 	id := blockByKey(key)
 	c.locks[id].RLock()

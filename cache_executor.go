@@ -59,6 +59,11 @@ func Exe(cache *simpleCacheDb, parser *baseCommandParser) (interface{}, error) {
 		return nil, cache.SetList(parser.key, parser.ttl, bytes.Split(parser.value, []byte(" ")))
 	case cmdSetDictLex:
 		return nil, cache.SetDict(parser.key, parser.ttl, bytes.Split(parser.value, []byte(" ")))
+	case cmdKeysLex:
+		return cache.Keys(), nil
+	case cmdRemoveLex:
+		cache.Remove(parser.key)
+		return nil, nil
 	default:
 		return nil, notFoundErr
 	}
