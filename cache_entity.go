@@ -4,6 +4,7 @@ import (
 	"errors"
 	"hash/fnv"
 	"time"
+	"fmt"
 )
 
 type (
@@ -29,6 +30,7 @@ var (
 	notFoundErr             = errors.New("Not found")
 	incorrectSelectKeyType  = errors.New("Incorrect select key type")
 	incorrectDictElementErr = errors.New("Incorrect dictionary element")
+	tooMatchListElementsErr = errors.New(fmt.Sprintf("Maximum list/distionary elements is %d", maxListElemennts))
 )
 
 func blockByKey(key string) uint8 {

@@ -16,7 +16,7 @@ func TestCmdParserKeys(t *testing.T) {
 		parser := &baseCommandParser{}
 		_, err := parser.Write([]byte(testData))
 		if err != nil {
-			t.Fatal("Got error:", err)
+			t.Fatal("Got Error:", err)
 		}
 
 		if result != parser.key {
@@ -36,7 +36,7 @@ func TestCmdParserKeys(t *testing.T) {
 		parser := &baseCommandParser{}
 		_, err := parser.Write([]byte(testData))
 		if err != nil {
-			t.Fatal("Got error:", err)
+			t.Fatal("Got Error:", err)
 		}
 
 		if result != parser.key {
@@ -55,7 +55,7 @@ func TestCmdFullParser(t *testing.T) {
 			in      string
 			cmd     string
 			key     string
-			ttl     int
+			ttl     int64
 			value   string
 			isError bool
 		}
@@ -87,13 +87,13 @@ func TestCmdFullParser(t *testing.T) {
 
 		if tc.isError {
 			if err == nil {
-				t.Fatal("Expected error", "got nil")
+				t.Fatal("Expected Error", "got nil")
 			}
 			continue
 		}
 
 		if err != nil {
-			t.Fatal("Got error:", err)
+			t.Fatal("Got Error:", err)
 		}
 
 		if parser.cmd != tc.cmd {
@@ -118,7 +118,7 @@ func TestCmdParserTTL(t *testing.T) {
 	type (
 		testCase struct {
 			in     string
-			ttl    int
+			ttl    int64
 			offset int
 			err    error
 		}
@@ -137,7 +137,7 @@ func TestCmdParserTTL(t *testing.T) {
 	for _, tc := range testCases {
 		ttl, offset, err := parseTTL([]byte(tc.in))
 		if err != tc.err {
-			t.Fatal("Incorrect error", "expected", tc.err, "got", err)
+			t.Fatal("Incorrect Error", "expected", tc.err, "got", err)
 		}
 
 		if offset != tc.offset {
@@ -153,6 +153,6 @@ func TestCmdParserTTL(t *testing.T) {
 func TestCmdParserBigTTL(t *testing.T) {
 	_, _, err := parseTTL([]byte("79874892749237947293748923432423423 "))
 	if err == nil {
-		t.Fatal("Expected error, got nil")
+		t.Fatal("Expected Error, got nil")
 	}
 }

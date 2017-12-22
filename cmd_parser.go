@@ -14,23 +14,27 @@ const (
 	maxKeyLength = 256
 	maxTTLLength = 19
 
-	cmdKeys    = 1 << iota
-	cmdRemove  = 1 << iota
-	cmdGet     = 1 << iota
-	cmdGetList = 1 << iota
-	cmdGetDict = 1 << iota
-	cmdSet     = 1 << iota
-	cmdSetList = 1 << iota
-	cmdSetDict = 1 << iota
+	cmdKeys = iota << 1
+	cmdRemove
+	cmdGet
+	cmdGetList
+	cmdGetDict
+	cmdSet
+	cmdSetList
+	cmdSetDict
+	cmdGetListElem
+	cmdGetDictElem
 
-	cmdKeysLex    = "KEYS"
-	cmdRemoveLex  = "REMOVE"
-	cmdGetLex     = "GET"
-	cmdGetListLex = "GETLIST"
-	cmdGetDictLex = "GETDICT"
-	cmdSetLex     = "SET"
-	cmdSetListLex = "SETLIST"
-	cmdSetDictLex = "SETDICT"
+	cmdKeysLex        = "KEYS"
+	cmdRemoveLex      = "REMOVE"
+	cmdGetLex         = "GET"
+	cmdGetListLex     = "GETLIST"
+	cmdGetListElemLex = "GETLISTELEM"
+	cmdGetDictLex     = "GETDICT"
+	cmdGetDictElemLex = "GETDICTELEM"
+	cmdSetLex         = "SET"
+	cmdSetListLex     = "SETLIST"
+	cmdSetDictLex     = "SETDICT"
 )
 
 var (
@@ -43,14 +47,16 @@ var (
 
 func init() {
 	approvedCommands = map[string]int{
-		cmdKeysLex:    cmdKeys,
-		cmdRemoveLex:  cmdRemove,
-		cmdGetLex:     cmdGet,
-		cmdGetListLex: cmdGetList,
-		cmdGetDictLex: cmdGetDict,
-		cmdSetLex:     cmdSet,
-		cmdSetListLex: cmdSetList,
-		cmdSetDictLex: cmdSetDict,
+		cmdKeysLex:        cmdKeys,
+		cmdRemoveLex:      cmdRemove,
+		cmdGetLex:         cmdGet,
+		cmdGetListLex:     cmdGetList,
+		cmdGetDictLex:     cmdGetDict,
+		cmdSetLex:         cmdSet,
+		cmdSetListLex:     cmdSetList,
+		cmdSetDictLex:     cmdSetDict,
+		cmdGetListElemLex: cmdGetListElem,
+		cmdGetDictElemLex: cmdGetDictElem,
 	}
 }
 
@@ -58,7 +64,7 @@ type (
 	baseCommandParser struct {
 		cmd          string
 		key          string
-		ttl          int
+		ttl          int64
 		value        []byte
 		headerParsed bool
 	}
@@ -147,7 +153,7 @@ func (r *baseCommandParser) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func parseTTL(p []byte) (int, int, error) {
+func parseTTL(p []byte) (int64, int, error) {
 	var num []byte
 
 	var hasWhitespace bool
@@ -177,5 +183,5 @@ loop:
 		return 0, 0, zeroTTl
 	}
 
-	return ttl, 1 + len(num), nil
+	return int64(ttl), 1 + len(num), nil
 }

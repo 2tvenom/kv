@@ -13,7 +13,7 @@ func TestGetSetSimpleCache(t *testing.T) {
 
 	data, err := cache.Get("foo")
 	if err != nil {
-		t.Fatal("Get key error", err.Error())
+		t.Fatal("Get key Error", err.Error())
 	}
 
 	if string(data) != val {
@@ -30,11 +30,11 @@ func TestGetSetTTLSimpleCache(t *testing.T) {
 
 	data, err := cache.Get("foo")
 	if err == nil {
-		t.Fatal("Expected error", "got nil", "data", data)
+		t.Fatal("Expected Error", "got nil", "Data", data)
 	}
 
 	if err != notFoundErr {
-		t.Fatal("Incorrect error", "expected", notFoundErr, "got", err)
+		t.Fatal("Incorrect Error", "expected", notFoundErr, "got", err)
 	}
 }
 
@@ -54,7 +54,7 @@ func TestGetSetListCache(t *testing.T) {
 
 	data, err := cache.GetList("foo")
 	if err != nil {
-		t.Fatal("Get key error", err.Error())
+		t.Fatal("Get key Error", err.Error())
 	}
 
 	for i, elem := range data {
@@ -68,7 +68,7 @@ func TestGetSetListCache(t *testing.T) {
 		//t.Log(pos)
 		elem, err := cache.GetListElement("foo", pos)
 		if err != nil {
-			t.Fatal("Get key error", err.Error(), pos)
+			t.Fatal("Get key Error", err.Error(), pos)
 		}
 
 		if string(elem) != string(val[pos]) {
@@ -78,7 +78,7 @@ func TestGetSetListCache(t *testing.T) {
 
 	_, err = cache.GetListElement("foo", 6)
 	if err != notFoundErr {
-		t.Fatal("Expected error", notFoundErr.Error(), "got", err)
+		t.Fatal("Expected Error", notFoundErr.Error(), "got", err)
 	}
 }
 
@@ -99,7 +99,7 @@ func TestGetSetDictCache(t *testing.T) {
 
 	data, err := cache.GetDict("foo")
 	if err != nil {
-		t.Fatal("Get key error", err.Error())
+		t.Fatal("Get key Error", err.Error())
 	}
 
 	for i, elem := range data {
@@ -110,15 +110,15 @@ func TestGetSetDictCache(t *testing.T) {
 
 	indexSearch := map[string]string{
 		"zbaz": "world",
-		"baz" :"foobaz",
-		"fooo" :"baz",
-		"c" :"hello",
-		"bar" :"BAR",
+		"baz":  "foobaz",
+		"fooo": "baz",
+		"c":    "hello",
+		"bar":  "BAR",
 	}
 	for key, val := range indexSearch {
 		elem, err := cache.GetDictElement("foo", []byte(key))
 		if err != nil {
-			t.Fatal("Get key error: ", err.Error())
+			t.Fatal("Get key Error: ", err.Error())
 		}
 
 		if string(elem) != val {
@@ -128,7 +128,7 @@ func TestGetSetDictCache(t *testing.T) {
 
 	_, err = cache.GetDictElement("foo", []byte("hello"))
 	if err != notFoundErr {
-		t.Fatal("Expected error", notFoundErr.Error(), "got", err)
+		t.Fatal("Expected Error", notFoundErr.Error(), "got", err)
 	}
 }
 
@@ -176,6 +176,199 @@ func BenchmarkSetParallel(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			cache.Set("bar", 0, []byte("foobar"))
+		}
+	})
+}
+
+func BenchmarkSetListParallel(b *testing.B) {
+	cache := newSimpleCacheDb()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.SetList("foo", 0, [][]byte{
+				[]byte("baz"),
+				[]byte("baz"),
+				[]byte("foo"),
+				[]byte("foobaz"),
+			})
+		}
+	})
+
+	b.RunParallel(func (pb *testing.PB) {
+		for pb.Next() {
+			cache.SetList("foobaz", 0, [][]byte{
+				[]byte("baz"),
+				[]byte("baz"),
+				[]byte("foo"),
+				[]byte("foobaz"),
+			})
+		}
+	})
+
+	b.RunParallel(func (pb *testing.PB) {
+		for pb.Next() {
+			cache.SetList("bar", 0, [][]byte{
+				[]byte("baz"),
+				[]byte("baz"),
+				[]byte("foo"),
+				[]byte("foobaz"),
+			})
+		}
+	})
+}
+
+func BenchmarkGetListParallel(b *testing.B) {
+	cache := newSimpleCacheDb()
+
+	cache.SetList("foobaz", 0, [][]byte{
+		[]byte("baz"),
+		[]byte("baz"),
+		[]byte("foo"),
+		[]byte("foobaz"),
+	})
+
+	cache.SetList("bar", 0, [][]byte{
+		[]byte("baz"),
+		[]byte("baz"),
+		[]byte("foo"),
+		[]byte("foobaz"),
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.GetList("foobaz")
+		}
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.Get("bar")
+		}
+	})
+}
+
+func BenchmarkGetListElemParallel(b *testing.B) {
+	cache := newSimpleCacheDb()
+
+	cache.SetList("bar", 0, [][]byte{
+		[]byte("baz"),
+		[]byte("baz"),
+		[]byte("foo"),
+		[]byte("foobaz"),
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.GetListElement("bar", 1)
+		}
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.GetListElement("bar", 2)
+		}
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.GetListElement("bar", 20)
+		}
+	})
+}
+
+func BenchmarkSetDictParallel(b *testing.B) {
+	cache := newSimpleCacheDb()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.SetDict("foo", 0, [][]byte{
+				[]byte("baz:bar"),
+				[]byte("baz:world"),
+				[]byte("foo:hello"),
+				[]byte("foobaz:test"),
+			})
+		}
+	})
+
+	b.RunParallel(func (pb *testing.PB) {
+		for pb.Next() {
+			cache.SetDict("foobaz", 0, [][]byte{
+				[]byte("baz:bar"),
+				[]byte("baz:world"),
+				[]byte("foo:hello"),
+				[]byte("foobaz:test"),
+			})
+		}
+	})
+
+	b.RunParallel(func (pb *testing.PB) {
+		for pb.Next() {
+			cache.SetDict("bar", 0, [][]byte{
+				[]byte("baz:bar"),
+				[]byte("baz:world"),
+				[]byte("foo:hello"),
+				[]byte("foobaz:test"),
+			})
+		}
+	})
+}
+
+func BenchmarkGetDictParallel(b *testing.B) {
+	cache := newSimpleCacheDb()
+
+	cache.SetList("foobaz", 0, [][]byte{
+		[]byte("baz:bar"),
+		[]byte("baz:world"),
+		[]byte("foo:hello"),
+		[]byte("foobaz:test"),
+	})
+
+	cache.SetList("bar", 0, [][]byte{
+		[]byte("baz:bar"),
+		[]byte("baz:world"),
+		[]byte("foo:hello"),
+		[]byte("foobaz:test"),
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.GetList("foobaz")
+		}
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.Get("bar")
+		}
+	})
+}
+
+
+func BenchmarkGetDictElemParallel(b *testing.B) {
+	cache := newSimpleCacheDb()
+
+	cache.SetList("bar", 0, [][]byte{
+		[]byte("baz:bar"),
+		[]byte("baz:world"),
+		[]byte("foo:hello"),
+		[]byte("foobaz:test"),
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.GetDictElement("bar", []byte("foo"))
+		}
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.GetDictElement("bar", []byte("baz"))
+		}
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			cache.GetDictElement("bar", []byte("hello"))
 		}
 	})
 }

@@ -12,7 +12,7 @@ import (
 type (
 	simpleCacheDb struct {
 		blocks [blocks]map[string][]byte
-		locks [blocks]sync.RWMutex
+		locks  [blocks]sync.RWMutex
 	}
 )
 
@@ -72,6 +72,9 @@ func (c *simpleCacheDb) set(key string, keyType uint8, ttl int64, value []byte) 
 }
 
 func (c *simpleCacheDb) setList(key string, keyType uint8, ttl int64, values [][]byte) error {
+	if len(values) > maxListElemennts {
+		return tooMatchListElementsErr
+	}
 	off := (len(values) * 2) + 2
 	lenBuff := off
 	for _, val := range values {
@@ -155,7 +158,11 @@ func (c *simpleCacheDb) GetListElement(key string, position uint16) ([]byte, err
 		return nil, err
 	}
 
-	return getElemByPosition(data, position)
+	off, elemLen, err := getElemByPosition(data, position)
+	if err != nil {
+		return nil, err
+	}
+	return data[off:off+elemLen], nil
 }
 
 func (c *simpleCacheDb) SetDict(key string, ttl int64, values dictionary) error {
@@ -184,17 +191,17 @@ func (c *simpleCacheDb) GetDictElement(key string, dictKey []byte) ([]byte, erro
 
 	//custom binary search
 	i := sort.Search(elemCount, func(position int) bool {
-		elem, _ := getElemByPosition(data, uint16(position))
+		off, elemLen, _ := getElemByPosition(data, uint16(position))
 
-		separatorPosition := uint64(uint16UnsafeConvert(elem))
-		return bytes.Compare(elem[2:2+separatorPosition], dictKey) >= 0
+		separatorPosition := uint64(uint16UnsafeConvert(data[off:off+elemLen]))
+		return bytes.Compare(data[off+2:off+2+separatorPosition], dictKey) >= 0
 	})
 
 	if i < elemCount {
-		elem, _ := getElemByPosition(data, uint16(i))
-		separatorPosition := uint64(uint16UnsafeConvert(elem))
-		if bytes.Equal(elem[2:2+separatorPosition], dictKey) {
-			return elem[2+1+separatorPosition:], nil
+		off, elemLen, _ := getElemByPosition(data, uint16(i))
+		separatorPosition := uint64(uint16UnsafeConvert(data[off:off+elemLen]))
+		if bytes.Equal(data[off+2:off+2+separatorPosition], dictKey) {
+			return data[off+2+1+separatorPosition:off+elemLen], nil
 		} else {
 			return nil, notFoundErr
 		}
@@ -210,10 +217,10 @@ func uint16UnsafeConvert(data []byte) uint16 {
 }
 
 //get element by position in byte slice
-func getElemByPosition(data []byte, position uint16) ([]byte, error) {
+func getElemByPosition(data []byte, position uint16) (uint64, uint64, error) {
 	elemCount := uint16UnsafeConvert(data)
 	if position >= elemCount {
-		return nil, notFoundErr
+		return 0, 0, notFoundErr
 	}
 
 	off := uint64(elemCount)*2 + 2
@@ -225,7 +232,6 @@ func getElemByPosition(data []byte, position uint16) ([]byte, error) {
 	elemLenData := make([]byte, 2)
 	copy(elemLenData, data[i*2+2: i*2+4])
 	elemLen := *(*uint16)(unsafe.Pointer(&elemLenData[0]))
-	out := make([]byte, elemLen)
-	copy(out, data[off:off+uint64(elemLen)])
-	return out, nil
+
+	return off, uint64(elemLen), nil
 }
