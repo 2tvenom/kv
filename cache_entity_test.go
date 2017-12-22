@@ -3,23 +3,21 @@ package main
 import (
 	"testing"
 	"unsafe"
-
+	"time"
 )
 
 func TestEntryMapping(t *testing.T) {
-	//val := []byte("Hello")
-	elem := &entry{12, 1, 10}
-
+	elem := &entry{72, uint64(time.Now().Unix()), 3}
+	t.Logf("Set elem: %+v; len: %d\n", elem, unsafe.Sizeof(elem))
 	data := *(*[headerLen]byte)(unsafe.Pointer(elem))
 	t.Logf("Data: %+v", data)
 
 	newElem := (*entry)(unsafe.Pointer(&data[0]))
 
-	t.Logf("New: %+v", newElem)
+	t.Logf("get elem: %+v\n", newElem)
 }
 
 func TestMappingInt(t *testing.T) {
-
 	var i uint16 = 65535
 
 	data := *(*[2]byte)(unsafe.Pointer(&i))
@@ -28,6 +26,14 @@ func TestMappingInt(t *testing.T) {
 	newElem := *(*uint16)(unsafe.Pointer(&data[0]))
 
 	t.Logf("New: %+v", newElem)
+}
+
+func TestTTL(t *testing.T) {
+	now := time.Now().Unix()
+
+	t.Logf("Now: %d, TTL: %d", now, getTTL(5))
+
+
 }
 
 func TestBlockByKey(t *testing.T) {

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"text/scanner"
 	"bytes"
-	"io"
 	"github.com/pkg/errors"
+	"io"
 	"strconv"
+	"text/scanner"
 	//"hash/fnv"
 )
 
@@ -34,11 +34,11 @@ const (
 )
 
 var (
-	approvedCommands           map[string]int
-	incorrectCommandError      = errors.New("Incorrect command name")
-	longKeyNameError           = errors.New("Maximum key name length is 256")
-	notTTl                     = errors.New("")
-	zeroTTl                    = errors.New("TTL can not be zero")
+	approvedCommands      map[string]int
+	incorrectCommandError = errors.New("Incorrect command name")
+	longKeyNameError      = errors.New("Maximum key name length is 256")
+	notTTl                = errors.New("")
+	zeroTTl               = errors.New("TTL can not be zero")
 )
 
 func init() {
@@ -120,8 +120,8 @@ func (r *baseCommandParser) Write(p []byte) (n int, err error) {
 			ttlOffset = len(p)
 		}
 
-		ttl, offset, err := parseTTL(p[s.Offset: ttlOffset])
-		switch(err) {
+		ttl, offset, err := parseTTL(p[s.Offset:ttlOffset])
+		switch err {
 		case nil:
 			s.Offset += offset
 			r.ttl = ttl

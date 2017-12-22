@@ -1,15 +1,23 @@
 package main
 
 import (
-	"unsafe"
+	"bytes"
+	"sort"
 	"time"
+	"unsafe"
+	"fmt"
+	"sync"
 )
 
 type (
 	simpleCacheDb struct {
 		blocks [blocks]map[string][]byte
-		lockers
+		locks [blocks]sync.RWMutex
 	}
+)
+
+var (
+	_ = fmt.Printf
 )
 
 func newSimpleCacheDb() *simpleCacheDb {
@@ -20,94 +28,124 @@ func newSimpleCacheDb() *simpleCacheDb {
 	return c
 }
 
-func (c *simpleCacheDb) Get(key string) ([]byte, error) {
-	return c.get(key, keyString)
-}
-
 func (c *simpleCacheDb) get(key string, keyType uint8) ([]byte, error) {
 	id := blockByKey(key)
-	c.RLock(id)
+	c.locks[id].RLock()
 	if data, ok := c.blocks[id][key]; ok {
-		e := data[:headerLen]
-		entry := (*entry)(unsafe.Pointer(&e[0]))
-		if entry.ttl > 0 && entry.ttl <= uint64(time.Now().Unix()) {
-			c.RUnlock(id)
-			c.Lock(id)
+		header := make([]byte, headerLen)
+		copy(header, data[:headerLen])
+		entry := (*entry)(unsafe.Pointer(&header[0]))
+		if entry.keyType != keyType {
+			return nil, incorrectSelectKeyType
+		}
+		now := time.Now().Unix()
+
+		if entry.ttl > 0 && entry.ttl <= uint64(now) {
+			c.locks[id].RUnlock()
+			c.locks[id].Lock()
 			delete(c.blocks[id], key)
-			c.Unlock(id)
+			c.locks[id].Unlock()
 			return nil, notFoundErr
 		}
 		out := make([]byte, entry.length)
 		copy(out, data[headerLen:])
-		c.RUnlock(id)
+		c.locks[id].RUnlock()
 		return out, nil
 	} else {
-		c.RUnlock(id)
+		c.locks[id].RUnlock()
 		return nil, notFoundErr
 	}
 }
 
-func (c *simpleCacheDb) Set(key string, ttl uint64, value []byte) bool {
-	return c.set(key, keyString, ttl, value)
-}
-
-func (c *simpleCacheDb) set(key string, keyType uint8, ttl uint64, value []byte) bool {
-	elem := &entry{uint64(len(value)), keyType, ttl}
+func (c *simpleCacheDb) set(key string, keyType uint8, ttl int64, value []byte) error {
+	elem := &entry{uint64(len(value)), getTTL(ttl), keyType}
 	data := *(*[headerLen]byte)(unsafe.Pointer(elem))
 
 	nVal := make([]byte, len(value))
 	copy(nVal, value)
 
 	id := blockByKey(key)
-	c.Lock(id)
+	c.locks[id].Lock()
 	c.blocks[id][key] = append(data[:], nVal...)
-	c.Unlock(id)
-	return true
+	c.locks[id].Unlock()
+	return nil
 }
 
-func (c *simpleCacheDb) SetList(key string, ttl uint64, values [][]byte) bool {
+func (c *simpleCacheDb) setList(key string, keyType uint8, ttl int64, values [][]byte) error {
 	off := (len(values) * 2) + 2
 	lenBuff := off
 	for _, val := range values {
 		lenBuff += len(val)
 	}
+
+	if keyType == keyDict {
+		lenBuff += len(values) * 2
+	}
+
 	buff := make([]byte, lenBuff)
+	//write counnt elements in record header
 	countElem := len(values)
 	data := *(*[2]byte)(unsafe.Pointer(&countElem))
 	copy(buff[:2], data[:])
 
 	for i, val := range values {
 		elemLen := len(val)
+		if keyType == keyDict {
+			elemLen += 2
+		}
+		//write elem length in record header
 		data := *(*[2]byte)(unsafe.Pointer(&elemLen))
 		copy(buff[i*2+2:(i*2)+4], data[:])
-		copy(buff[off:off+elemLen], val)
+		if keyType == keyDict {
+			//additional separator index in record start
+			sepIndex := uint16(bytes.Index(val, dictionarySeparator))
+			sepData := *(*[2]byte)(unsafe.Pointer(&sepIndex))
+			copy(buff[off:off+2], sepData[:])
+			copy(buff[off+2:off+elemLen], val)
+		} else {
+			copy(buff[off:off+elemLen], val)
+		}
 		off += elemLen
 	}
 
-	return c.set(key, keyList, ttl, buff)
+	return c.set(key, keyType, ttl, buff)
 }
 
-func (c *simpleCacheDb) GetList(key string) ([][]byte, error) {
-	data, err := c.get(key, keyList)
+func (c *simpleCacheDb) SetList(key string, ttl int64, values [][]byte) error {
+	return c.setList(key, keyList, ttl, values)
+}
 
+func (c *simpleCacheDb) Get(key string) ([]byte, error) {
+	return c.get(key, keyString)
+}
+
+func (c *simpleCacheDb) Set(key string, ttl int64, value []byte) error {
+	return c.set(key, keyString, ttl, value)
+}
+
+func (c *simpleCacheDb) getList(key string, keyType uint8) ([][]byte, error) {
+	data, err := c.get(key, keyType)
 	if err != nil {
 		return nil, err
 	}
 
-	elemCount := *(*uint16)(unsafe.Pointer(&data[0]))
+	elemCount := uint16UnsafeConvert(data)
 	out := make([][]byte, elemCount)
 
 	off := (elemCount * 2) + 2
 	var i uint16
 	for i = 0; i < elemCount; i++ {
-		elemLen := *(*uint16)(unsafe.Pointer(&data[i*2+2:i*2+4][0]))
+		elemLen := uint16UnsafeConvert(data[i*2+2: i*2+4])
 		out[i] = make([]byte, elemLen)
 		copy(out[i], data[off:off+elemLen])
-		println(string(out[i]))
 		off += elemLen
 	}
 
 	return out, nil
+}
+
+func (c *simpleCacheDb) GetList(key string) ([][]byte, error) {
+	return c.getList(key, keyList)
 }
 
 func (c *simpleCacheDb) GetListElement(key string, position uint16) ([]byte, error) {
@@ -117,21 +155,77 @@ func (c *simpleCacheDb) GetListElement(key string, position uint16) ([]byte, err
 		return nil, err
 	}
 
-	elemCount := *(*uint16)(unsafe.Pointer(&data[0]))
+	return getElemByPosition(data, position)
+}
 
+func (c *simpleCacheDb) SetDict(key string, ttl int64, values dictionary) error {
+	for _, val := range values {
+		if bytes.Index(val, dictionarySeparator) == -1 {
+			return incorrectDictElementErr
+		}
+	}
+	sort.Sort(values)
+
+	return c.setList(key, keyDict, ttl, values)
+}
+
+func (c *simpleCacheDb) GetDict(key string) ([][]byte, error) {
+	return c.getList(key, keyDict)
+}
+
+func (c *simpleCacheDb) GetDictElement(key string, dictKey []byte) ([]byte, error) {
+	data, err := c.get(key, keyDict)
+
+	if err != nil {
+		return nil, err
+	}
+
+	elemCount := int(uint16UnsafeConvert(data))
+
+	//custom binary search
+	i := sort.Search(elemCount, func(position int) bool {
+		elem, _ := getElemByPosition(data, uint16(position))
+
+		separatorPosition := uint64(uint16UnsafeConvert(elem))
+		return bytes.Compare(elem[2:2+separatorPosition], dictKey) >= 0
+	})
+
+	if i < elemCount {
+		elem, _ := getElemByPosition(data, uint16(i))
+		separatorPosition := uint64(uint16UnsafeConvert(elem))
+		if bytes.Equal(elem[2:2+separatorPosition], dictKey) {
+			return elem[2+1+separatorPosition:], nil
+		} else {
+			return nil, notFoundErr
+		}
+	} else {
+		return nil, notFoundErr
+	}
+}
+
+func uint16UnsafeConvert(data []byte) uint16 {
+	elemCountData := make([]byte, 2)
+	copy(elemCountData, data[0:2])
+	return *(*uint16)(unsafe.Pointer(&elemCountData[0]))
+}
+
+//get element by position in byte slice
+func getElemByPosition(data []byte, position uint16) ([]byte, error) {
+	elemCount := uint16UnsafeConvert(data)
 	if position >= elemCount {
 		return nil, notFoundErr
 	}
 
-	off := uint64(elemCount) * 2 + 2
+	off := uint64(elemCount)*2 + 2
 	var i uint16
 	for i = 0; i < position; i++ {
-		off += uint64(*(*uint16)(unsafe.Pointer(&data[i*2+2:i*2+4][0])))
+		off += uint64(uint16UnsafeConvert(data[i*2+2: i*2+4]))
 	}
 
-	elemLen := *(*uint16)(unsafe.Pointer(&data[position*2+2:position*2+4][0]))
+	elemLenData := make([]byte, 2)
+	copy(elemLenData, data[i*2+2: i*2+4])
+	elemLen := *(*uint16)(unsafe.Pointer(&elemLenData[0]))
 	out := make([]byte, elemLen)
 	copy(out, data[off:off+uint64(elemLen)])
-
 	return out, nil
 }
