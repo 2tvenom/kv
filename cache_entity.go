@@ -2,9 +2,9 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"hash/fnv"
 	"time"
-	"fmt"
 )
 
 type (

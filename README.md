@@ -1,9 +1,11 @@
 ### Build 
 `go build`
 
+Auth certificates
+
+`./genca.sh`
 ### Run
 `./kv`
-
 ### Requests
 #### http / tcp (ncat required)
 Set key
@@ -75,3 +77,8 @@ Remove key
 `curl -d 'REMOVE key' http://localhost:4500`
 
 `echo "REMOVE key" | ncat 127.0.0.1 4501`
+
+
+#### Auth request
+
+`curl -d "SETDICT aaa foo:baz bar:foo baz:bazbaz aa:foo_baz" --cert client.crt --key client.key -k "https://localhost:4500/"`

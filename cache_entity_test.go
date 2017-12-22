@@ -2,8 +2,8 @@ package main
 
 import (
 	"testing"
-	"unsafe"
 	"time"
+	"unsafe"
 )
 
 func TestEntryMapping(t *testing.T) {
@@ -32,7 +32,6 @@ func TestTTL(t *testing.T) {
 	now := time.Now().Unix()
 
 	t.Logf("Now: %d, TTL: %d", now, getTTL(5))
-
 
 }
 

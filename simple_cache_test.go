@@ -194,7 +194,7 @@ func BenchmarkSetListParallel(b *testing.B) {
 		}
 	})
 
-	b.RunParallel(func (pb *testing.PB) {
+	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			cache.SetList("foobaz", 0, [][]byte{
 				[]byte("baz"),
@@ -205,7 +205,7 @@ func BenchmarkSetListParallel(b *testing.B) {
 		}
 	})
 
-	b.RunParallel(func (pb *testing.PB) {
+	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			cache.SetList("bar", 0, [][]byte{
 				[]byte("baz"),
@@ -290,7 +290,7 @@ func BenchmarkSetDictParallel(b *testing.B) {
 		}
 	})
 
-	b.RunParallel(func (pb *testing.PB) {
+	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			cache.SetDict("foobaz", 0, [][]byte{
 				[]byte("baz:bar"),
@@ -301,7 +301,7 @@ func BenchmarkSetDictParallel(b *testing.B) {
 		}
 	})
 
-	b.RunParallel(func (pb *testing.PB) {
+	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			cache.SetDict("bar", 0, [][]byte{
 				[]byte("baz:bar"),
@@ -342,7 +342,6 @@ func BenchmarkGetDictParallel(b *testing.B) {
 		}
 	})
 }
-
 
 func BenchmarkGetDictElemParallel(b *testing.B) {
 	cache := newSimpleCacheDb()

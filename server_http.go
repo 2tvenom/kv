@@ -24,6 +24,13 @@ func (s *httpServer) registerHandler(f func(http.ResponseWriter, *http.Request))
 	s.mux.HandleFunc("/", f)
 }
 
+func (s *httpServer) listenSecure() error {
+	cert, key, cfg := getTLSConfig()
+	s.server.TLSConfig = cfg
+
+	return s.server.ListenAndServeTLS(cert, key)
+}
+
 func (s *httpServer) listen() error {
 	return s.server.ListenAndServe()
 }

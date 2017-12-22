@@ -1,13 +1,13 @@
 package main
 
 import (
-	"flag"
-	"net/http"
-	"io"
 	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
 	"log"
 	"net"
-	"fmt"
+	"net/http"
 	"sync"
 )
 
@@ -18,8 +18,10 @@ var (
 	httpAddr = flag.String("http-addr", "127.0.0.1", "Http server listen address")
 	useHttp  = flag.Bool("use-http", true, "Use http server")
 	useTcp   = flag.Bool("use-tcp", true, "Use tcp server")
+	secure   = flag.Bool("secure", false, "Enable TLS auth")
 	tcpPort  = flag.Int("tcp-port", 4501, "TCP server port")
 	tcpAddr  = flag.String("tcp-addr", "127.0.0.1", "TCP server listen address")
+
 )
 
 type (
@@ -63,15 +65,18 @@ func main() {
 				return
 			}
 
-			log.Printf("OUT %+v\n", out)
-
 			e.Encode(&output{Data: out})
 			return
 		})
 
 		w.Add(1)
 		go func() {
-			err := httpServer.listen()
+			var err error
+			if *secure {
+				err = httpServer.listenSecure()
+			} else {
+				err = httpServer.listen()
+			}
 			if err != nil {
 				log.Fatalf("Http server error: %s", err.Error())
 			}
@@ -81,60 +86,57 @@ func main() {
 
 	if *useTcp {
 		w.Add(1)
-		l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", *tcpAddr, *tcpPort))
-		if err != nil {
-			log.Fatalf("Error listening: %s", err.Error())
-		}
-		// Close the listener when the application closes.
-		defer l.Close()
-		for {
-			// Listen for an incoming connection.
-			conn, err := l.Accept()
+
+		tcpServer := newTcpServer(*tcpAddr, *tcpPort)
+		tcpServer.registerHandler(func(conn net.Conn) {
+			defer conn.Close()
+
+			parser := &baseCommandParser{}
+			_, err := io.Copy(parser, conn)
 			if err != nil {
-				log.Fatalf("Error accepting: %s", err.Error())
+				conn.Write([]byte(fmt.Sprintf("Error: %s", err.Error())))
+				return
+			}
+			log.Printf("CMD: %+v", parser)
+
+			out, err := Exe(cache, parser)
+			if err != nil {
+				if err == notFoundErr {
+					conn.Write([]byte("not found"))
+					return
+				}
+				conn.Write([]byte(fmt.Sprintf("Error: %s", err.Error())))
+				return
 			}
 
-			go func() {
-				defer conn.Close()
-				log.Println("GOT CONN")
-
-				parser := &baseCommandParser{}
-				_, err := io.Copy(parser, conn)
-				if err != nil {
-					log.Println("GOT ERR", err.Error())
-					conn.Write([]byte(fmt.Sprintf("Error: %s", err.Error())))
-					return
+			switch v := out.(type) {
+			case string:
+				conn.Write([]byte(v))
+			case []string:
+				for _, e := range v {
+					conn.Write([]byte(e + "\n"))
 				}
-				log.Printf("CMD: %+v", parser)
-
-				out, err := Exe(cache, parser)
-				if err != nil {
-					if err == notFoundErr {
-						conn.Write([]byte("not found"))
-						return
-					}
-					conn.Write([]byte(fmt.Sprintf("Error: %s", err.Error())))
-					return
+			case map[string]string:
+				for k, e := range v {
+					conn.Write([]byte(k + "\n"))
+					conn.Write([]byte(e + "\n"))
 				}
+			}
+		})
 
-				fmt.Printf("%+v\n", out)
+		go func() {
+			var err error
+			if *secure {
+				err = tcpServer.listenSecure()
+			} else {
+				err = tcpServer.listen()
+			}
 
-				switch v := out.(type) {
-				case string:
-					conn.Write([]byte(v))
-				case []string:
-					for _, e := range v {
-						conn.Write([]byte(e + "\n"))
-					}
-				case map[string]string:
-					for k, e := range v {
-						conn.Write([]byte(k + "\n"))
-						conn.Write([]byte(e + "\n"))
-					}
-				}
-
-			}()
-		}
+			if err != nil {
+				log.Fatalf("TCP server error: %s", err.Error())
+			}
+			w.Done()
+		}()
 	}
 
 	w.Wait()

@@ -2,11 +2,11 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
+	"sync"
 	"time"
 	"unsafe"
-	"fmt"
-	"sync"
 )
 
 type (
@@ -28,7 +28,7 @@ func newSimpleCacheDb() *simpleCacheDb {
 	return c
 }
 
-func (c *simpleCacheDb) Keys() ([]string) {
+func (c *simpleCacheDb) Keys() []string {
 	out := []string{}
 	for i, block := range c.blocks {
 		c.locks[i].Lock()
@@ -157,7 +157,7 @@ func (c *simpleCacheDb) getList(key string, keyType uint8) ([][]byte, error) {
 	off := (elemCount * 2) + 2
 	var i uint16
 	for i = 0; i < elemCount; i++ {
-		elemLen := uint16UnsafeConvert(data[i*2+2: i*2+4])
+		elemLen := uint16UnsafeConvert(data[i*2+2 : i*2+4])
 		out[i] = make([]byte, elemLen)
 		copy(out[i], data[off:off+elemLen])
 		off += elemLen
@@ -181,7 +181,7 @@ func (c *simpleCacheDb) GetListElement(key string, position uint16) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	return data[off:off+elemLen], nil
+	return data[off : off+elemLen], nil
 }
 
 func (c *simpleCacheDb) SetDict(key string, ttl int64, values dictionary) error {
@@ -212,15 +212,15 @@ func (c *simpleCacheDb) GetDictElement(key string, dictKey []byte) ([]byte, erro
 	i := sort.Search(elemCount, func(position int) bool {
 		off, elemLen, _ := getElemByPosition(data, uint16(position))
 
-		separatorPosition := uint64(uint16UnsafeConvert(data[off:off+elemLen]))
+		separatorPosition := uint64(uint16UnsafeConvert(data[off : off+elemLen]))
 		return bytes.Compare(data[off+2:off+2+separatorPosition], dictKey) >= 0
 	})
 
 	if i < elemCount {
 		off, elemLen, _ := getElemByPosition(data, uint16(i))
-		separatorPosition := uint64(uint16UnsafeConvert(data[off:off+elemLen]))
+		separatorPosition := uint64(uint16UnsafeConvert(data[off : off+elemLen]))
 		if bytes.Equal(data[off+2:off+2+separatorPosition], dictKey) {
-			return data[off+2+1+separatorPosition:off+elemLen], nil
+			return data[off+2+1+separatorPosition : off+elemLen], nil
 		} else {
 			return nil, notFoundErr
 		}
@@ -245,11 +245,11 @@ func getElemByPosition(data []byte, position uint16) (uint64, uint64, error) {
 	off := uint64(elemCount)*2 + 2
 	var i uint16
 	for i = 0; i < position; i++ {
-		off += uint64(uint16UnsafeConvert(data[i*2+2: i*2+4]))
+		off += uint64(uint16UnsafeConvert(data[i*2+2 : i*2+4]))
 	}
 
 	elemLenData := make([]byte, 2)
-	copy(elemLenData, data[i*2+2: i*2+4])
+	copy(elemLenData, data[i*2+2:i*2+4])
 	elemLen := *(*uint16)(unsafe.Pointer(&elemLenData[0]))
 
 	return off, uint64(elemLen), nil
