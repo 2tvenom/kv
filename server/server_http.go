@@ -63,11 +63,17 @@ func (s *httpServer) handler(writer http.ResponseWriter, request *http.Request) 
 	return
 }
 
-func (s *httpServer) ListenSecure() error {
-	cert, key, cfg := getTLSConfig()
-	s.server.TLSConfig = cfg
+func (s *httpServer) ListenSecure(certPath string, keyPath string) error {
+	tlsConfig, err := getTLS(certPath)
+	if err != nil {
+		return nil
+	}
 
-	return s.server.ListenAndServeTLS(cert, key)
+	tlsConfig.BuildNameToCertificate()
+
+	s.server.TLSConfig = tlsConfig
+
+	return s.server.ListenAndServeTLS(certPath, keyPath)
 }
 
 func (s *httpServer) Listen() error {

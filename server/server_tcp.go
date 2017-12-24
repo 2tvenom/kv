@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"crypto/rand"
 	"time"
 
 	"github.com/2tvenom/kv/kv"
@@ -218,9 +219,21 @@ func (s *tcpServer) listenServ(l net.Listener) error {
 	}
 }
 
-func (s *tcpServer) ListenSecure() error {
-	_, _, cfg := getTLSConfig()
-	l, err := tls.Listen("tcp", fmt.Sprintf("%s:%d", s.addr, s.port), cfg)
+func (s *tcpServer) ListenSecure(certPath string, keyPath string) error {
+	tlsConfig, err := getTLS(certPath)
+	if err != nil {
+		return nil
+	}
+
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		return err
+	}
+
+	tlsConfig.Certificates = []tls.Certificate{cert}
+	tlsConfig.Rand = rand.Reader
+
+	l, err := tls.Listen("tcp", fmt.Sprintf("%s:%d", s.addr, s.port), tlsConfig)
 	if err != nil {
 		return err
 	}

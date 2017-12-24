@@ -1,15 +1,15 @@
 package server
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"io/ioutil"
+	"crypto/x509"
+	"crypto/tls"
 )
 
-func getTLSConfig() (string, string, *tls.Config) {
-	caCert, err := ioutil.ReadFile("ca.crt")
+func getTLS(caCertPath string) (*tls.Config, error){
+	caCert, err := ioutil.ReadFile(caCertPath)
 	if err != nil {
-		panic("Error read cert: " + err.Error())
+		return nil, err
 	}
 
 	caCertPool := x509.NewCertPool()
@@ -20,6 +20,5 @@ func getTLSConfig() (string, string, *tls.Config) {
 		ClientAuth: tls.RequireAndVerifyClientCert,
 	}
 
-	tlsConfig.BuildNameToCertificate()
-	return "ca.crt", "ca.key", tlsConfig
+	return tlsConfig, nil
 }

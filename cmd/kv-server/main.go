@@ -19,9 +19,12 @@ var (
 	tcpPortNcat = flag.Int("tcp-port-ncat", 4501, "TCP server port for nncat")
 	tcpPort     = flag.Int("tcp-port", 4502, "TCP server port")
 	tcpAddr     = flag.String("tcp-addr", "127.0.0.1", "TCP server listen address")
+	certPath    = flag.String("cert-path", "", "Server cert path")
+	keyPath     = flag.String("key-path", "", "Server key path")
 )
 
 func main() {
+	flag.Parse()
 	cache := kv.NewCacheDb()
 
 	w := sync.WaitGroup{}
@@ -31,7 +34,7 @@ func main() {
 		go func() {
 			var err error
 			if *secure {
-				err = httpServer.ListenSecure()
+				err = httpServer.ListenSecure(*certPath, *keyPath)
 			} else {
 				err = httpServer.Listen()
 			}
@@ -66,7 +69,7 @@ func main() {
 		go func() {
 			var err error
 			if *secure {
-				err = tcpServer.ListenSecure()
+				err = tcpServer.ListenSecure(*certPath, *keyPath)
 			} else {
 				err = tcpServer.Listen()
 			}

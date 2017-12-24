@@ -1,11 +1,22 @@
 ### Build 
-`go build`
+`go build ./cmd/kv-server`
+`go build ./cmd/kv-bench`
+
+### Run test
+`./genca.sh`
+
+`go test -v ./...`
 
 Auth certificates
 
 `./genca.sh`
 ### Run
-`./kv`
+`./kv-server`
+
+### Bench
+`./kv-server`
+
+`./kv-bench`
 ### Requests
 #### http / tcp (ncat required)
 Set key
@@ -80,5 +91,8 @@ Remove key
 
 
 #### Auth request
+
+Run server with keys  
+`./kv-server -secure -cert-path ca.crt -key-path ca.key`
 
 `curl -d "SETDICT aaa foo:baz bar:foo baz:bazbaz aa:foo_baz" --cert client.crt --key client.key -k "https://localhost:4500/"`

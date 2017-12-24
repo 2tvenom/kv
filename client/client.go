@@ -9,6 +9,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"crypto/tls"
 )
 
 type (
@@ -18,6 +19,10 @@ type (
 		conns *list.List
 		addr  string
 		port  int
+
+		certPath string
+		keyPath  string
+		isSecure bool
 
 		maxIdleConns int
 	}
@@ -61,6 +66,14 @@ func NewClient(addr string, port int) *Client {
 	}
 }
 
+func NewSecureClient(addr string, port int, certPath string, keyPath string) *Client {
+	client := NewClient(addr, port)
+	client.isSecure = true
+	client.certPath = certPath
+	client.keyPath = keyPath
+	return client
+}
+
 func (c *Client) Close() {
 	c.Lock()
 	defer c.Unlock()
@@ -83,13 +96,21 @@ func (c *Client) Get() (*PoolConn, error) {
 }
 
 func (c *Client) newConn() (co net.Conn, err error) {
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.addr, c.port))
-	if err != nil {
-		return nil, err
+	addr := fmt.Sprintf("%s:%d", c.addr, c.port)
+
+	if c.isSecure {
+		cert, err := tls.LoadX509KeyPair(c.certPath, c.keyPath)
+		if err != nil {
+			return nil, err
+		}
+		config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+		//fmt.Printf("cfg: %+v\n", config)
+		return tls.Dial("tcp", addr, &config)
 	}
 
-	return conn, nil
+	return net.Dial("tcp", addr)
 }
+
 func (c *Client) get() (co net.Conn, err error) {
 	c.Lock()
 	if c.conns.Len() == 0 {

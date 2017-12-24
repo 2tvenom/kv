@@ -9,6 +9,49 @@ import (
 	"github.com/2tvenom/kv/server"
 )
 
+func TestClient_Secure(t *testing.T) {
+	addr, port := "127.0.0.1", 4502
+	cache := kv.NewCacheDb()
+
+	ts := server.NewTcpServer(cache, addr, port)
+	go func() {
+		err := ts.ListenSecure("../ca.crt", "../ca.key")
+		if err != nil {
+			t.Fatalf("Server err: %s\n", err.Error())
+		}
+	}()
+
+	time.Sleep(time.Second * 2)
+
+	client := NewSecureClient(addr, port, "../client.crt", "../client.key")
+
+	val := "value"
+	data, err := client.Do("SET key " + val)
+	if err != nil {
+		t.Fatal("Set error", err.Error())
+	}
+
+	out, ok := data.(bool)
+	if !ok {
+		t.Fatal("Incorrect response", "expected true", "got", out)
+	}
+
+	data, err = client.Do("GET key")
+	if err != nil {
+		t.Fatal("Get error", err.Error())
+	}
+
+	outStr, ok := data.(string)
+	if !ok {
+		t.Fatal("Incorrect response", "expected string", "got", out)
+	}
+
+	if outStr != val {
+		t.Fatal("Incorrect response", "expected", val, "got", outStr)
+	}
+}
+
+
 func TestClient_Do(t *testing.T) {
 	addr, port := "127.0.0.1", 4502
 	cache := kv.NewCacheDb()
@@ -108,3 +151,4 @@ func TestClient_Do(t *testing.T) {
 
 	t.Log("Dict response", outStrList)
 }
+
