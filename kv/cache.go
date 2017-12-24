@@ -11,7 +11,7 @@ import (
 )
 
 type (
-	simpleCacheDb struct {
+	CacheDb struct {
 		blocks [blocks]map[string][]byte
 		locks  [blocks]sync.RWMutex
 	}
@@ -21,15 +21,15 @@ var (
 	_ = fmt.Printf
 )
 
-func newSimpleCacheDb() *simpleCacheDb {
-	c := &simpleCacheDb{}
+func NewCacheDb() *CacheDb {
+	c := &CacheDb{}
 	for i := 0; i < blocks; i++ {
 		c.blocks[i] = map[string][]byte{}
 	}
 	return c
 }
 
-func (c *simpleCacheDb) Keys() []string {
+func (c *CacheDb) Keys() []string {
 	out := []string{}
 	for i, block := range c.blocks {
 		c.locks[i].Lock()
@@ -41,14 +41,14 @@ func (c *simpleCacheDb) Keys() []string {
 	return out
 }
 
-func (c *simpleCacheDb) Remove(key string) {
+func (c *CacheDb) Remove(key string) {
 	id := blockByKey(key)
 	c.locks[id].Lock()
 	delete(c.blocks[id], key)
 	c.locks[id].Unlock()
 }
 
-func (c *simpleCacheDb) get(key string, keyType uint8) ([]byte, error) {
+func (c *CacheDb) get(key string, keyType uint8) ([]byte, error) {
 	id := blockByKey(key)
 	c.locks[id].RLock()
 	log.Printf("Entry: %+v", c.blocks[id])
@@ -78,7 +78,7 @@ func (c *simpleCacheDb) get(key string, keyType uint8) ([]byte, error) {
 	}
 }
 
-func (c *simpleCacheDb) set(key string, keyType uint8, ttl int64, value []byte) error {
+func (c *CacheDb) set(key string, keyType uint8, ttl int64, value []byte) error {
 	elem := &entry{uint64(len(value)), getTTL(ttl), keyType}
 	data := *(*[headerLen]byte)(unsafe.Pointer(elem))
 
@@ -92,7 +92,7 @@ func (c *simpleCacheDb) set(key string, keyType uint8, ttl int64, value []byte) 
 	return nil
 }
 
-func (c *simpleCacheDb) setList(key string, keyType uint8, ttl int64, values [][]byte) error {
+func (c *CacheDb) setList(key string, keyType uint8, ttl int64, values [][]byte) error {
 	if len(values) > maxListElemennts {
 		return tooMatchListElementsErr
 	}
@@ -134,19 +134,19 @@ func (c *simpleCacheDb) setList(key string, keyType uint8, ttl int64, values [][
 	return c.set(key, keyType, ttl, buff)
 }
 
-func (c *simpleCacheDb) SetList(key string, ttl int64, values [][]byte) error {
+func (c *CacheDb) SetList(key string, ttl int64, values [][]byte) error {
 	return c.setList(key, keyList, ttl, values)
 }
 
-func (c *simpleCacheDb) Get(key string) ([]byte, error) {
+func (c *CacheDb) Get(key string) ([]byte, error) {
 	return c.get(key, keyString)
 }
 
-func (c *simpleCacheDb) Set(key string, ttl int64, value []byte) error {
+func (c *CacheDb) Set(key string, ttl int64, value []byte) error {
 	return c.set(key, keyString, ttl, value)
 }
 
-func (c *simpleCacheDb) getList(key string, keyType uint8) ([][]byte, error) {
+func (c *CacheDb) getList(key string, keyType uint8) ([][]byte, error) {
 	data, err := c.get(key, keyType)
 	if err != nil {
 		return nil, err
@@ -167,11 +167,11 @@ func (c *simpleCacheDb) getList(key string, keyType uint8) ([][]byte, error) {
 	return out, nil
 }
 
-func (c *simpleCacheDb) GetList(key string) ([][]byte, error) {
+func (c *CacheDb) GetList(key string) ([][]byte, error) {
 	return c.getList(key, keyList)
 }
 
-func (c *simpleCacheDb) GetListElement(key string, position uint16) ([]byte, error) {
+func (c *CacheDb) GetListElement(key string, position uint16) ([]byte, error) {
 	data, err := c.get(key, keyList)
 
 	if err != nil {
@@ -185,7 +185,7 @@ func (c *simpleCacheDb) GetListElement(key string, position uint16) ([]byte, err
 	return data[off: off+elemLen], nil
 }
 
-func (c *simpleCacheDb) SetDict(key string, ttl int64, values dictionary) error {
+func (c *CacheDb) SetDict(key string, ttl int64, values dictionary) error {
 	for _, val := range values {
 		if bytes.Index(val, dictionarySeparator) == -1 {
 			return incorrectDictElementErr
@@ -196,11 +196,11 @@ func (c *simpleCacheDb) SetDict(key string, ttl int64, values dictionary) error 
 	return c.setList(key, keyDict, ttl, values)
 }
 
-func (c *simpleCacheDb) GetDict(key string) ([][]byte, error) {
+func (c *CacheDb) GetDict(key string) ([][]byte, error) {
 	return c.getList(key, keyDict)
 }
 
-func (c *simpleCacheDb) GetDictElement(key string, dictKey []byte) ([]byte, error) {
+func (c *CacheDb) GetDictElement(key string, dictKey []byte) ([]byte, error) {
 	data, err := c.get(key, keyDict)
 
 	if err != nil {
