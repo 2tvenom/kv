@@ -3,10 +3,15 @@ package main
 import (
 	"bytes"
 	"strconv"
+	"errors"
 )
 
 func Exe(cache *simpleCacheDb, parser *baseCommandParser) (interface{}, error) {
 	parser.value = bytes.TrimSpace(parser.value)
+	if !parser.headerParsed {
+		return nil, errors.New("Incorrect command")
+	}
+	//log.Printf("CMD %+v", parser)
 	switch parser.cmd {
 	case cmdGetLex:
 		data, err := cache.Get(parser.key)

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 	"unsafe"
+	"log"
 )
 
 type (
@@ -50,6 +51,7 @@ func (c *simpleCacheDb) Remove(key string) {
 func (c *simpleCacheDb) get(key string, keyType uint8) ([]byte, error) {
 	id := blockByKey(key)
 	c.locks[id].RLock()
+	log.Printf("Entry: %+v", c.blocks[id])
 	if data, ok := c.blocks[id][key]; ok {
 		header := make([]byte, headerLen)
 		copy(header, data[:headerLen])
@@ -106,8 +108,7 @@ func (c *simpleCacheDb) setList(key string, keyType uint8, ttl int64, values [][
 
 	buff := make([]byte, lenBuff)
 	//write counnt elements in record header
-	countElem := len(values)
-	data := *(*[2]byte)(unsafe.Pointer(&countElem))
+	data := sliceUnsafeConvert(uint16(len(values)))
 	copy(buff[:2], data[:])
 
 	for i, val := range values {
@@ -116,12 +117,12 @@ func (c *simpleCacheDb) setList(key string, keyType uint8, ttl int64, values [][
 			elemLen += 2
 		}
 		//write elem length in record header
-		data := *(*[2]byte)(unsafe.Pointer(&elemLen))
+		data := sliceUnsafeConvert(uint16(elemLen))
 		copy(buff[i*2+2:(i*2)+4], data[:])
 		if keyType == keyDict {
 			//additional separator index in record start
 			sepIndex := uint16(bytes.Index(val, dictionarySeparator))
-			sepData := *(*[2]byte)(unsafe.Pointer(&sepIndex))
+			sepData := sliceUnsafeConvert(uint16(sepIndex))
 			copy(buff[off:off+2], sepData[:])
 			copy(buff[off+2:off+elemLen], val)
 		} else {
@@ -157,7 +158,7 @@ func (c *simpleCacheDb) getList(key string, keyType uint8) ([][]byte, error) {
 	off := (elemCount * 2) + 2
 	var i uint16
 	for i = 0; i < elemCount; i++ {
-		elemLen := uint16UnsafeConvert(data[i*2+2 : i*2+4])
+		elemLen := uint16UnsafeConvert(data[i*2+2: i*2+4])
 		out[i] = make([]byte, elemLen)
 		copy(out[i], data[off:off+elemLen])
 		off += elemLen
@@ -181,7 +182,7 @@ func (c *simpleCacheDb) GetListElement(key string, position uint16) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	return data[off : off+elemLen], nil
+	return data[off: off+elemLen], nil
 }
 
 func (c *simpleCacheDb) SetDict(key string, ttl int64, values dictionary) error {
@@ -212,15 +213,15 @@ func (c *simpleCacheDb) GetDictElement(key string, dictKey []byte) ([]byte, erro
 	i := sort.Search(elemCount, func(position int) bool {
 		off, elemLen, _ := getElemByPosition(data, uint16(position))
 
-		separatorPosition := uint64(uint16UnsafeConvert(data[off : off+elemLen]))
+		separatorPosition := uint64(uint16UnsafeConvert(data[off: off+elemLen]))
 		return bytes.Compare(data[off+2:off+2+separatorPosition], dictKey) >= 0
 	})
 
 	if i < elemCount {
 		off, elemLen, _ := getElemByPosition(data, uint16(i))
-		separatorPosition := uint64(uint16UnsafeConvert(data[off : off+elemLen]))
+		separatorPosition := uint64(uint16UnsafeConvert(data[off: off+elemLen]))
 		if bytes.Equal(data[off+2:off+2+separatorPosition], dictKey) {
-			return data[off+2+1+separatorPosition : off+elemLen], nil
+			return data[off+2+1+separatorPosition: off+elemLen], nil
 		} else {
 			return nil, notFoundErr
 		}
@@ -235,6 +236,10 @@ func uint16UnsafeConvert(data []byte) uint16 {
 	return *(*uint16)(unsafe.Pointer(&elemCountData[0]))
 }
 
+func sliceUnsafeConvert(val uint16) []byte {
+	return (*(*[2]byte)(unsafe.Pointer(&val)))[:]
+}
+
 //get element by position in byte slice
 func getElemByPosition(data []byte, position uint16) (uint64, uint64, error) {
 	elemCount := uint16UnsafeConvert(data)
@@ -245,12 +250,9 @@ func getElemByPosition(data []byte, position uint16) (uint64, uint64, error) {
 	off := uint64(elemCount)*2 + 2
 	var i uint16
 	for i = 0; i < position; i++ {
-		off += uint64(uint16UnsafeConvert(data[i*2+2 : i*2+4]))
+		off += uint64(uint16UnsafeConvert(data[i*2+2: i*2+4]))
 	}
 
-	elemLenData := make([]byte, 2)
-	copy(elemLenData, data[i*2+2:i*2+4])
-	elemLen := *(*uint16)(unsafe.Pointer(&elemLenData[0]))
-
+	elemLen := uint16UnsafeConvert(data[i*2+2: i*2+4])
 	return off, uint64(elemLen), nil
 }

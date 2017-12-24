@@ -7,14 +7,14 @@ import (
 	"strconv"
 	"text/scanner"
 	//"hash/fnv"
+	"fmt"
 )
 
 const (
-	minBuffSize  = 512
 	maxKeyLength = 256
 	maxTTLLength = 19
 
-	cmdKeys = iota << 1
+	cmdKeys = iota
 	cmdRemove
 	cmdGet
 	cmdGetList
@@ -74,12 +74,15 @@ type (
 func (r *baseCommandParser) Write(p []byte) (n int, err error) {
 	if !r.headerParsed {
 		var s scanner.Scanner
-		s.Init(bytes.NewBuffer(p))
+		buff:= bytes.NewBuffer(p)
+		s.Init(buff)
+
+		defer fmt.Printf("## %s\n", buff.String())
 
 		//scan command
 		tok := s.Scan()
 		if tok == scanner.EOF {
-			return s.Offset, io.EOF
+			return 0, io.EOF
 		}
 
 		//check command
@@ -100,7 +103,7 @@ func (r *baseCommandParser) Write(p []byte) (n int, err error) {
 		//scan key name
 		tok = s.Scan()
 		if tok == scanner.EOF {
-			return s.Offset, io.EOF
+			return 0, io.EOF
 		}
 
 		r.key = s.TokenText()
@@ -117,7 +120,7 @@ func (r *baseCommandParser) Write(p []byte) (n int, err error) {
 		//scan ttl if exist
 		tok = s.Scan()
 		if tok == scanner.EOF {
-			return s.Offset, io.EOF
+			return 0, io.EOF
 		}
 
 		ttlOffset := s.Offset + maxTTLLength + 2
@@ -133,7 +136,7 @@ func (r *baseCommandParser) Write(p []byte) (n int, err error) {
 			r.ttl = ttl
 			tok = s.Scan()
 			if tok == scanner.EOF {
-				return s.Offset, io.EOF
+				return 0, io.EOF
 			}
 		case notTTl:
 		case zeroTTl:

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"io/ioutil"
-	"crypto/x509"
 	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 )
 
 func getTLSConfig() (string, string, *tls.Config) {
