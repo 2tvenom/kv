@@ -6,7 +6,7 @@ import (
 )
 
 func TestGetSetSimpleCache(t *testing.T) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	val := "baz"
 	cache.Set("foo", 0, []byte(val))
@@ -22,7 +22,7 @@ func TestGetSetSimpleCache(t *testing.T) {
 }
 
 func TestGetSetTTLSimpleCache(t *testing.T) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	val := "baz"
 	cache.Set("foo", 2, []byte(val))
@@ -39,7 +39,7 @@ func TestGetSetTTLSimpleCache(t *testing.T) {
 }
 
 func TestGetSetListCache(t *testing.T) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	val := [][]byte{
 		[]byte("baz"),
@@ -83,7 +83,7 @@ func TestGetSetListCache(t *testing.T) {
 }
 
 func TestGetSetDictCache(t *testing.T) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	val := [][]byte{
 		[]byte("foo:baz"),
@@ -133,7 +133,7 @@ func TestGetSetDictCache(t *testing.T) {
 }
 
 func BenchmarkGetParallel(b *testing.B) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	cache.Set("foo", 0, []byte("bar"))
 	cache.Set("baz", 0, []byte("barbaz"))
@@ -159,7 +159,7 @@ func BenchmarkGetParallel(b *testing.B) {
 }
 
 func BenchmarkSetParallel(b *testing.B) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -181,7 +181,7 @@ func BenchmarkSetParallel(b *testing.B) {
 }
 
 func BenchmarkSetListParallel(b *testing.B) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -218,7 +218,7 @@ func BenchmarkSetListParallel(b *testing.B) {
 }
 
 func BenchmarkGetListParallel(b *testing.B) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	cache.SetList("foobaz", 0, [][]byte{
 		[]byte("baz"),
@@ -248,7 +248,7 @@ func BenchmarkGetListParallel(b *testing.B) {
 }
 
 func BenchmarkGetListElemParallel(b *testing.B) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	cache.SetList("bar", 0, [][]byte{
 		[]byte("baz"),
@@ -277,7 +277,7 @@ func BenchmarkGetListElemParallel(b *testing.B) {
 }
 
 func BenchmarkSetDictParallel(b *testing.B) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -314,7 +314,7 @@ func BenchmarkSetDictParallel(b *testing.B) {
 }
 
 func BenchmarkGetDictParallel(b *testing.B) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	cache.SetList("foobaz", 0, [][]byte{
 		[]byte("baz:bar"),
@@ -344,7 +344,7 @@ func BenchmarkGetDictParallel(b *testing.B) {
 }
 
 func BenchmarkGetDictElemParallel(b *testing.B) {
-	cache := newSimpleCacheDb()
+	cache := NewCacheDb()
 
 	cache.SetList("bar", 0, [][]byte{
 		[]byte("baz:bar"),

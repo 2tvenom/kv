@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 	"unsafe"
-	"log"
 )
 
 type (
@@ -51,7 +50,6 @@ func (c *CacheDb) Remove(key string) {
 func (c *CacheDb) get(key string, keyType uint8) ([]byte, error) {
 	id := blockByKey(key)
 	c.locks[id].RLock()
-	log.Printf("Entry: %+v", c.blocks[id])
 	if data, ok := c.blocks[id][key]; ok {
 		header := make([]byte, headerLen)
 		copy(header, data[:headerLen])
