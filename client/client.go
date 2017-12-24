@@ -1,17 +1,25 @@
-package main
+package client
 
 import (
+	"container/list"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"strings"
-	"encoding/binary"
+	"sync"
 )
 
 type (
 	Client struct {
-		conn net.Conn
+		sync.Mutex
+
+		conns *list.List
+		addr  string
+		port  int
+
+		maxIdleConns int
 	}
 )
 
@@ -31,31 +39,111 @@ var (
 	NotFoundErr = errors.New("Not found")
 )
 
-func NewClient(addr string, port int) (*Client, error) {
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", addr, port))
+type PoolConn struct {
+	net.Conn
+	c *Client
+}
+
+func (c *PoolConn) Close() {
+	c.c.put(c.Conn)
+}
+
+func (c *PoolConn) Finalize() {
+	c.Conn.Close()
+}
+
+func NewClient(addr string, port int) *Client {
+	return &Client{
+		addr:         addr,
+		port:         port,
+		maxIdleConns: 16,
+		conns:        list.New(),
+	}
+}
+
+func (c *Client) Close() {
+	c.Lock()
+	defer c.Unlock()
+
+	for c.conns.Len() > 0 {
+		e := c.conns.Front()
+		co := e.Value.(net.Conn)
+		c.conns.Remove(e)
+		co.Close()
+	}
+}
+
+func (c *Client) Get() (*PoolConn, error) {
+	co, err := c.get()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Client{conn: conn}, nil
+	return &PoolConn{co, c}, err
+}
+
+func (c *Client) newConn() (co net.Conn, err error) {
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.addr, c.port))
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+func (c *Client) get() (co net.Conn, err error) {
+	c.Lock()
+	if c.conns.Len() == 0 {
+		c.Unlock()
+		co, err = c.newConn()
+	} else {
+		e := c.conns.Front()
+		co = e.Value.(net.Conn)
+		c.conns.Remove(e)
+
+		c.Unlock()
+	}
+
+	return
+}
+
+func (c *Client) put(conn net.Conn) {
+	c.Lock()
+	defer c.Unlock()
+
+	for c.conns.Len() >= c.maxIdleConns {
+		// remove back
+		e := c.conns.Back()
+		co := e.Value.(net.Conn)
+		c.conns.Remove(e)
+		co.Close()
+	}
+
+	c.conns.PushFront(conn)
 }
 
 func (c *Client) Do(cmd string) (interface{}, error) {
+	conn, err := c.get()
+	if err != nil {
+		return nil, err
+	}
+
+	defer c.put(conn)
+
 	data := uint32ToBytesClientConvert(uint32(len(cmd)))
-	_, err := c.conn.Write(append([]byte{header}, data...))
+	_, err = conn.Write(append([]byte{header}, data...))
 	if err != nil {
 		return nil, err
 	}
 
 	buff := strings.NewReader(cmd)
-	_, err = io.Copy(c.conn, buff)
+	_, err = io.Copy(conn, buff)
 
 	if err != nil {
 		return nil, err
 	}
 
 	header := make([]byte, 1)
-	_, err = c.conn.Read(header)
+	_, err = conn.Read(header)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +152,7 @@ func (c *Client) Do(cmd string) (interface{}, error) {
 	switch header[0] {
 	case ok:
 		dataType := make([]byte, 1)
-		_, err = c.conn.Read(dataType)
+		_, err = conn.Read(dataType)
 		if err != nil {
 			return nil, err
 		}
@@ -73,20 +161,20 @@ func (c *Client) Do(cmd string) (interface{}, error) {
 		case typeNone:
 			return true, nil
 		case typeString:
-			buff, err := readData(c.conn)
+			buff, err := readData(conn)
 			if err != nil {
 				return nil, err
 			}
 			return string(buff), nil
 		case typeList:
-			cnt, err := readUInt(c.conn)
+			cnt, err := readUInt(conn)
 			if err != nil {
 				return err, nil
 			}
 
 			out := make([]string, cnt)
 			for i := 0; i < int(cnt); i++ {
-				buff, err := readData(c.conn)
+				buff, err := readData(conn)
 				if err != nil {
 					return nil, err
 				}
@@ -95,7 +183,7 @@ func (c *Client) Do(cmd string) (interface{}, error) {
 
 			return out, nil
 		case typeDict:
-			cnt, err := readUInt(c.conn)
+			cnt, err := readUInt(conn)
 			if err != nil {
 				return err, nil
 			}
@@ -103,11 +191,11 @@ func (c *Client) Do(cmd string) (interface{}, error) {
 			out := map[string]string{}
 
 			for i := 0; i < int(cnt); i++ {
-				key, err := readData(c.conn)
+				key, err := readData(conn)
 				if err != nil {
 					return nil, err
 				}
-				value, err := readData(c.conn)
+				value, err := readData(conn)
 				if err != nil {
 					return nil, err
 				}
@@ -121,7 +209,7 @@ func (c *Client) Do(cmd string) (interface{}, error) {
 	case notFound:
 		return nil, NotFoundErr
 	case errHead:
-		errBuff, err := readData(c.conn)
+		errBuff, err := readData(conn)
 		if err != nil {
 			return nil, err
 		}

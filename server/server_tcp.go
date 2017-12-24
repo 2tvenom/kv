@@ -1,19 +1,20 @@
-package main
+package server
 
 import (
 	"crypto/tls"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
-	"errors"
-	"encoding/binary"
 	"time"
+
+	"github.com/2tvenom/kv/kv"
 )
 
 type (
 	tcpServer struct {
-		cache           *simpleCacheDb
+		cache           *kv.CacheDb
 		addr            string
 		port            int
 		isHumanListener bool
@@ -32,7 +33,7 @@ const (
 	dataTypeDict   = 0x53
 )
 
-func newTcpServer(cache *simpleCacheDb, addr string, port int) *tcpServer {
+func NewTcpServer(cache *kv.CacheDb, addr string, port int) *tcpServer {
 	return &tcpServer{
 		addr:  addr,
 		port:  port,
@@ -40,7 +41,7 @@ func newTcpServer(cache *simpleCacheDb, addr string, port int) *tcpServer {
 	}
 }
 
-func (s *tcpServer) isHuman(b bool) {
+func (s *tcpServer) IsHuman(b bool) {
 	s.isHumanListener = b
 }
 
@@ -53,7 +54,7 @@ func (s *tcpServer) humanHandler(conn net.Conn) {
 		conn.Write([]byte(fmt.Sprintf("Error: %s", err.Error())))
 		return
 	}
-	log.Printf("CMD: %+v", parser)
+	//log.Printf("CMD: %+v", parser)
 
 	out, err := Exe(s.cache, parser)
 	if err != nil {
@@ -116,7 +117,7 @@ func (s *tcpServer) clientHandler(conn net.Conn) {
 			continue
 		}
 
-		log.Printf("CMD LEN: %d %d [% x]", requestLen, n, header[1:5])
+		//log.Printf("CMD LEN: %d %d [% x]", requestLen, n, header[1:5])
 		if err != nil {
 			_, err := conn.Write(errPack(err))
 			if err != nil {
@@ -125,7 +126,7 @@ func (s *tcpServer) clientHandler(conn net.Conn) {
 			continue
 		}
 
-		log.Printf("CMD: %+v %+v", parser, err)
+		//log.Printf("CMD: %+v %+v", parser, err)
 
 		out, err := Exe(s.cache, parser)
 		if err != nil {
@@ -145,8 +146,12 @@ func (s *tcpServer) clientHandler(conn net.Conn) {
 
 		switch data := out.(type) {
 		case string:
-			conn.Write([]byte{okHeader, dataTypeString})
-			err := senBuff(data, conn)
+			buff := []byte{okHeader, dataTypeString}
+			lenPack := uint32ToBytesConvert(uint32(len(data)))
+			buff = append(buff, lenPack...)
+			buff = append(buff, []byte(data)...)
+
+			_, err := conn.Write(buff)
 			if err != nil {
 				return
 			}
@@ -156,38 +161,45 @@ func (s *tcpServer) clientHandler(conn net.Conn) {
 			if err != nil {
 				return
 			}
+
+			buff := []byte{}
 			for _, e := range data {
-				err := senBuff(e, conn)
-				if err != nil {
-					return
-				}
+				lenPack := uint32ToBytesConvert(uint32(len(e)))
+				buff = append(buff, lenPack...)
+				buff = append(buff, []byte(e)...)
 			}
+
+			_, err = conn.Write(buff)
+			if err != nil {
+				return
+			}
+
 		case map[string]string:
 			lenPack := uint32ToBytesConvert(uint32(len(data)))
 			_, err := conn.Write(append([]byte{okHeader, dataTypeDict}, lenPack...))
 			if err != nil {
 				return
 			}
+
+			buff := []byte{}
 			for k, v := range data {
-				err := senBuff(k, conn)
-				if err != nil {
-					return
-				}
-				err = senBuff(v, conn)
-				if err != nil {
-					return
-				}
+				lenPack := uint32ToBytesConvert(uint32(len(k)))
+				buff = append(buff, lenPack...)
+				buff = append(buff, []byte(k)...)
+
+				lenPack = uint32ToBytesConvert(uint32(len(v)))
+				buff = append(buff, lenPack...)
+				buff = append(buff, []byte(v)...)
+			}
+
+			_, err = conn.Write(buff)
+			if err != nil {
+				return
 			}
 		default:
 			conn.Write([]byte{okHeader, dataTypeNone})
 		}
 	}
-}
-
-func senBuff(buff string, conn net.Conn) error {
-	lenPack := uint32ToBytesConvert(uint32(len(buff)))
-	_, err := conn.Write(append(lenPack, []byte(buff)...))
-	return err
 }
 
 func (s *tcpServer) listenServ(l net.Listener) error {
@@ -206,7 +218,7 @@ func (s *tcpServer) listenServ(l net.Listener) error {
 	}
 }
 
-func (s *tcpServer) listenSecure() error {
+func (s *tcpServer) ListenSecure() error {
 	_, _, cfg := getTLSConfig()
 	l, err := tls.Listen("tcp", fmt.Sprintf("%s:%d", s.addr, s.port), cfg)
 	if err != nil {
@@ -218,7 +230,7 @@ func (s *tcpServer) listenSecure() error {
 	return nil
 }
 
-func (s *tcpServer) listen() error {
+func (s *tcpServer) Listen() error {
 	l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.addr, s.port))
 	if err != nil {
 		return err

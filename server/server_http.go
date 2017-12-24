@@ -1,16 +1,17 @@
-package main
+package server
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+
+	"github.com/2tvenom/kv/kv"
 )
 
 type (
 	httpServer struct {
-		cache  *simpleCacheDb
+		cache  *kv.CacheDb
 		server *http.Server
 	}
 
@@ -20,7 +21,7 @@ type (
 	}
 )
 
-func newHttpServer(cache *simpleCacheDb, addr string, port int) *httpServer {
+func NewHttpServer(cache *kv.CacheDb, addr string, port int) *httpServer {
 	s := &httpServer{
 		cache: cache,
 	}
@@ -39,11 +40,11 @@ func (s *httpServer) handler(writer http.ResponseWriter, request *http.Request) 
 	parser := &baseCommandParser{}
 	_, err := io.Copy(parser, request.Body)
 
-	log.Printf("CMD %+v\n", parser)
+	//log.Printf("CMD %+v\n", parser)
 
 	if err != nil {
-		e.Encode(&output{Error: err.Error()})
 		writer.WriteHeader(http.StatusInternalServerError)
+		e.Encode(&output{Error: err.Error()})
 		return
 	}
 
@@ -53,8 +54,8 @@ func (s *httpServer) handler(writer http.ResponseWriter, request *http.Request) 
 			writer.WriteHeader(http.StatusNotFound)
 			return
 		}
-		e.Encode(&output{Error: err.Error()})
 		writer.WriteHeader(http.StatusInternalServerError)
+		e.Encode(&output{Error: err.Error()})
 		return
 	}
 
@@ -62,13 +63,13 @@ func (s *httpServer) handler(writer http.ResponseWriter, request *http.Request) 
 	return
 }
 
-func (s *httpServer) listenSecure() error {
+func (s *httpServer) ListenSecure() error {
 	cert, key, cfg := getTLSConfig()
 	s.server.TLSConfig = cfg
 
 	return s.server.ListenAndServeTLS(cert, key)
 }
 
-func (s *httpServer) listen() error {
+func (s *httpServer) Listen() error {
 	return s.server.ListenAndServe()
 }

@@ -1,13 +1,11 @@
-package main
+package server
 
 import (
 	"bytes"
-	"github.com/pkg/errors"
+	"errors"
 	"io"
 	"strconv"
 	"text/scanner"
-	//"hash/fnv"
-	"fmt"
 )
 
 const (
@@ -74,10 +72,10 @@ type (
 func (r *baseCommandParser) Write(p []byte) (n int, err error) {
 	if !r.headerParsed {
 		var s scanner.Scanner
-		buff:= bytes.NewBuffer(p)
+		buff := bytes.NewBuffer(p)
 		s.Init(buff)
 
-		defer fmt.Printf("## %s\n", buff.String())
+		//defer fmt.Printf("## %s\n", buff.String())
 
 		//scan command
 		tok := s.Scan()

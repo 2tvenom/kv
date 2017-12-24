@@ -1,12 +1,19 @@
-package main
+package server
 
 import (
 	"bytes"
-	"strconv"
 	"errors"
+	"strconv"
+	"unsafe"
+
+	"github.com/2tvenom/kv/kv"
 )
 
-func Exe(cache *simpleCacheDb, parser *baseCommandParser) (interface{}, error) {
+var (
+	notFoundErr = errors.New("Not found")
+)
+
+func Exe(cache *kv.CacheDb, parser *baseCommandParser) (interface{}, error) {
 	parser.value = bytes.TrimSpace(parser.value)
 	if !parser.headerParsed {
 		return nil, errors.New("Incorrect command")
@@ -72,4 +79,10 @@ func Exe(cache *simpleCacheDb, parser *baseCommandParser) (interface{}, error) {
 	default:
 		return nil, notFoundErr
 	}
+}
+
+func uint16UnsafeConvert(data []byte) uint16 {
+	elemCountData := make([]byte, 2)
+	copy(elemCountData, data[0:2])
+	return *(*uint16)(unsafe.Pointer(&elemCountData[0]))
 }

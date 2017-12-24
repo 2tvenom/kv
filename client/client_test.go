@@ -1,24 +1,24 @@
-package main
+package client
 
 import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/2tvenom/kv/kv"
+	"github.com/2tvenom/kv/server"
 )
 
 func TestClient_Do(t *testing.T) {
 	addr, port := "127.0.0.1", 4502
-	cache := newSimpleCacheDb()
+	cache := kv.NewCacheDb()
 
-	ts := newTcpServer(cache, addr, port)
-	go ts.listen()
+	ts := server.NewTcpServer(cache, addr, port)
+	go ts.Listen()
 
 	time.Sleep(time.Second * 2)
 
-	client, err := NewClient(addr, port)
-	if err != nil {
-		t.Fatal("Client error", err.Error())
-	}
+	client := NewClient(addr, port)
 
 	val := "value"
 	data, err := client.Do("SET key " + val)
